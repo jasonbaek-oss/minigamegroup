@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "node",
+      "args": ["C:\\Users\\seonghyeon.baek\\Desktop\\Claude_Cowork\\CLAUDE\\tradingview-mcp-aibridge\\src\\server.js"]
+    }
+  }
+}
