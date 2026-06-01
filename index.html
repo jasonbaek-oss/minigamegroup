@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎮 게임 허브</title>
+  <style>
+    :root {
+      --bg: #1a1a2e; --panel: #16213e; --blue: #0f3460;
+      --red: #e94560; --accent: #4fc3f7; --green: #81c784;
+      --text: #e8eaf6; --muted: #8892b0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; min-height: 100vh; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(26,26,46,0.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      height: 58px; display: flex; align-items: center; padding: 0 36px;
+    }
+    .nav-logo { font-size: 1.25rem; font-weight: 800; color: var(--accent); letter-spacing: 1px; }
+    .nav-count {
+      margin-left: 12px; padding: 2px 9px; border-radius: 10px;
+      background: rgba(79,195,247,0.15); color: var(--accent);
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+    }
+
+    .hero {
+      padding: 140px 20px 80px; text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(79,195,247,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,195,247,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .hero-glow {
+      position: absolute; width: 700px; height: 500px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(79,195,247,0.07) 0%, transparent 70%);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+    }
+    .hero-content { position: relative; }
+    .hero-badge {
+      display: inline-block; padding: 4px 16px;
+      border: 1px solid rgba(79,195,247,0.4); border-radius: 20px;
+      font-size: 0.72rem; color: var(--accent); letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 22px;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 800;
+      line-height: 1.15; margin-bottom: 16px;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--muted); font-size: 1.08rem; }
+
+    .games-section { padding: 50px 20px 100px; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 0.72rem; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .section-title { font-size: 1.85rem; font-weight: 700; margin-bottom: 38px; }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 900px) { .games-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 580px) { .games-grid { grid-template-columns: 1fr; } }
+
+    .game-card {
+      background: var(--panel); border-radius: 18px; padding: 30px 26px 28px;
+      text-decoration: none; color: inherit; display: block;
+      border: 1px solid rgba(255,255,255,0.07);
+      transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s;
+      position: relative; overflow: hidden;
+    }
+    .game-card:hover { transform: translateY(-6px); }
+    .card-glow {
+      position: absolute; inset: 0; opacity: 0;
+      transition: opacity 0.3s; pointer-events: none;
+    }
+    .game-card:hover .card-glow { opacity: 1; }
+
+    .c-mine  { border-top: 3px solid #e94560; }
+    .c-mine:hover  { border-color: #e94560; box-shadow: 0 12px 40px rgba(233,69,96,.18); }
+    .c-mine  .card-glow { background: radial-gradient(ellipse at 50% 0%, rgba(233,69,96,.07), transparent 65%); }
+    .c-mine  .play-btn  { background: #e94560; }
+
+    .c-2048  { border-top: 3px solid #ff9800; }
+    .c-2048:hover  { border-color: #ff9800; box-shadow: 0 12px 40px rgba(255,152,0,.18); }
+    .c-2048  .card-glow { background: radial-gradient(ellipse at 50% 0%, rgba(255,152,0,.07), transparent 65%); }
+    .c-2048  .play-btn  { background: #ff9800; }
+
+    .c-snake { border-top: 3px solid #81c784; }
+    .c-snake:hover { border-color: #81c784; box-shadow: 0 12px 40px rgba(129,199,132,.18); }
+    .c-snake .card-glow { background: radial-gradient(ellipse at 50% 0%, rgba(129,199,132,.07), transparent 65%); }
+    .c-snake .play-btn  { background: #4caf50; }
+
+    .c-tetris { border-top: 3px solid #ce93d8; }
+    .c-tetris:hover { border-color: #ce93d8; box-shadow: 0 12px 40px rgba(206,147,216,.18); }
+    .c-tetris .card-glow { background: radial-gradient(ellipse at 50% 0%, rgba(206,147,216,.07), transparent 65%); }
+    .c-tetris .play-btn  { background: #9c27b0; }
+
+    .c-break { border-top: 3px solid #4fc3f7; }
+    .c-break:hover { border-color: #4fc3f7; box-shadow: 0 12px 40px rgba(79,195,247,.18); }
+    .c-break .card-glow { background: radial-gradient(ellipse at 50% 0%, rgba(79,195,247,.07), transparent 65%); }
+    .c-break .play-btn  { background: #0288d1; }
+
+    .card-icon { font-size: 2.6rem; margin-bottom: 14px; display: block; }
+    .card-tags { display: flex; gap: 7px; margin-bottom: 12px; }
+    .tag {
+      padding: 2px 9px; border-radius: 10px; font-size: 0.7rem;
+      font-weight: 600; background: rgba(255,255,255,0.08); color: var(--muted);
+    }
+    .card-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 8px; }
+    .card-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.65; margin-bottom: 24px; }
+    .play-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 22px; border-radius: 22px;
+      font-size: 0.88rem; font-weight: 700; border: none;
+      cursor: pointer; color: #fff;
+      transition: opacity .18s, transform .18s;
+      position: relative; z-index: 1;
+    }
+    .play-btn:hover { opacity: .87; transform: scale(1.04); }
+
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .55s ease, transform .55s ease; }
+    .reveal.on { opacity: 1; transform: none; }
+
+    footer {
+      background: var(--panel); border-top: 1px solid rgba(255,255,255,0.05);
+      padding: 32px 20px; text-align: center;
+      color: var(--muted); font-size: 0.84rem;
+    }
+    .foot-logo { font-size: 1rem; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">🎮 게임 허브</span>
+  <span class="nav-count">5 GAMES</span>
+</nav>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="hero-badge">Browser Game Collection</div>
+    <h1>클래식 게임을<br><span>브라우저에서</span></h1>
+    <p>설치 없이 바로 즐기는 5가지 인기 게임 모음</p>
+  </div>
+</div>
+
+<section class="games-section">
+  <p class="section-label">Game Collection</p>
+  <h2 class="section-title">게임 선택</h2>
+  <div class="games-grid">
+
+    <a href="games/minesweeper.html" class="game-card c-mine reveal">
+      <div class="card-glow"></div>
+      <span class="card-icon">💣</span>
+      <div class="card-tags"><span class="tag">퍼즐</span><span class="tag">논리</span></div>
+      <h3 class="card-title">지뢰찾기</h3>
+      <p class="card-desc">숫자를 단서로 지뢰 위치를 추리하세요. 3단계 난이도·첫 클릭 보호·깃발 시스템 포함.</p>
+      <button class="play-btn">🎮 플레이하기 →</button>
+    </a>
+
+    <a href="games/2048.html" class="game-card c-2048 reveal">
+      <div class="card-glow"></div>
+      <span class="card-icon">🔢</span>
+      <div class="card-tags"><span class="tag">퍼즐</span><span class="tag">전략</span></div>
+      <h3 class="card-title">2048</h3>
+      <p class="card-desc">방향키로 숫자 블록을 밀어 같은 숫자를 합치세요. 2048 타일을 만들면 승리!</p>
+      <button class="play-btn">🎮 플레이하기 →</button>
+    </a>
+
+    <a href="games/snake.html" class="game-card c-snake reveal">
+      <div class="card-glow"></div>
+      <span class="card-icon">🐍</span>
+      <div class="card-tags"><span class="tag">아케이드</span><span class="tag">반응속도</span></div>
+      <h3 class="card-title">스네이크</h3>
+      <p class="card-desc">먹이를 먹을수록 뱀이 길어집니다. 벽이나 자신의 몸에 부딪히면 게임 오버!</p>
+      <button class="play-btn">🎮 플레이하기 →</button>
+    </a>
+
+    <a href="games/tetris.html" class="game-card c-tetris reveal">
+      <div class="card-glow"></div>
+      <span class="card-icon">🧱</span>
+      <div class="card-tags"><span class="tag">퍼즐</span><span class="tag">속도</span></div>
+      <h3 class="card-title">테트리스</h3>
+      <p class="card-desc">떨어지는 블록을 회전·이동해 가로줄을 채우세요. 4줄 동시 클리어에 도전!</p>
+      <button class="play-btn">🎮 플레이하기 →</button>
+    </a>
+
+    <a href="games/breakout.html" class="game-card c-break reveal">
+      <div class="card-glow"></div>
+      <span class="card-icon">🏓</span>
+      <div class="card-tags"><span class="tag">아케이드</span><span class="tag">반응속도</span></div>
+      <h3 class="card-title">브레이크아웃</h3>
+      <p class="card-desc">패들로 공을 튕겨 모든 벽돌을 부수세요. 3목숨으로 전체 클리어에 도전!</p>
+      <button class="play-btn">🎮 플레이하기 →</button>
+    </a>
+
+  </div>
+</section>
+
+<footer>
+  <p class="foot-logo">🎮 게임 허브</p>
+  <p>브라우저에서 즐기는 클래식 게임 컬렉션 &nbsp;·&nbsp; HTML · CSS · JavaScript</p>
+  <p style="margin-top:6px;font-size:.78rem;opacity:.5;">Built with Claude Code</p>
+</footer>
+
+<script>
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('on'), i * 80);
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>

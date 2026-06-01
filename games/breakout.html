@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏓 브레이크아웃</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e; color: #e8eaf6;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding-top: 60px;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(26,26,46,0.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      height: 52px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 28px;
+    }
+    .nav-back { color: #8892b0; text-decoration: none; font-size: 0.88rem; transition: color .2s; }
+    .nav-back:hover { color: #e8eaf6; }
+    .nav-title { font-size: 1rem; font-weight: 700; color: #4fc3f7; }
+
+    h1 { font-size: 2rem; margin: 22px 0 14px; color: #4fc3f7; font-weight: 800; }
+
+    .top-bar {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 16px; flex-wrap: wrap; justify-content: center;
+    }
+    .stat-box {
+      background: #16213e; border: 1px solid rgba(79,195,247,0.25);
+      border-radius: 10px; padding: 7px 18px; text-align: center; min-width: 80px;
+    }
+    .stat-label { font-size: 0.62rem; color: #8892b0; letter-spacing: 1px; text-transform: uppercase; }
+    .stat-val { font-size: 1.3rem; font-weight: 800; color: #4fc3f7; }
+    .stat-val.lives { color: #e94560; }
+
+    .new-btn {
+      padding: 8px 20px; border: none; border-radius: 20px;
+      background: #0288d1; color: #fff; font-size: 0.88rem;
+      font-weight: 700; cursor: pointer; transition: background .2s, transform .15s;
+    }
+    .new-btn:hover { background: #0277bd; transform: scale(1.04); }
+
+    .canvas-wrap {
+      border: 2px solid rgba(79,195,247,0.25); border-radius: 10px;
+      box-shadow: 0 0 40px rgba(79,195,247,0.08); overflow: hidden;
+    }
+    #canvas { display: block; cursor: none; }
+
+    .hint { margin-top: 14px; color: #8892b0; font-size: 0.8rem; text-align: center; line-height: 1.75; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="../index.html" class="nav-back">← 허브로</a>
+  <span class="nav-title">🏓 브레이크아웃</span>
+  <span></span>
+</nav>
+
+<h1>브레이크아웃</h1>
+
+<div class="top-bar">
+  <div class="stat-box">
+    <div class="stat-label">점수</div>
+    <div class="stat-val" id="score">0</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">목숨</div>
+    <div class="stat-val lives" id="lives">❤️❤️❤️</div>
+  </div>
+  <button class="new-btn" id="newBtn">새 게임</button>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="canvas" width="460" height="520"></canvas>
+</div>
+
+<p class="hint">마우스 또는 ← → 키로 패들 조작<br>클릭 또는 스페이스로 시작 · R키로 재시작</p>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+
+  const BRICK_ROWS=6, BRICK_COLS=8;
+  const BRICK_W=(W-20)/BRICK_COLS-5;
+  const BRICK_H=18;
+  const BRICK_COLORS=['#e94560','#ff7043','#ffb74d','#ffd54f','#81c784','#4fc3f7'];
+
+  let paddle, ball, bricks, score, lives, gameOver, won, started, raf;
+  const keys={};
+
+  function init() {
+    paddle={x:W/2-45, y:H-40, w:90, h:12, speed:7};
+    ball={x:W/2, y:H-70, vx:3.5, vy:-4, r:7, baseSpeed:5.5};
+    bricks=[];
+    for (let r=0;r<BRICK_ROWS;r++)
+      for (let c=0;c<BRICK_COLS;c++)
+        bricks.push({
+          x:10+c*(BRICK_W+5), y:55+r*(BRICK_H+5),
+          w:BRICK_W, h:BRICK_H,
+          alive:true, color:BRICK_COLORS[r]
+        });
+    score=0; lives=3; gameOver=false; won=false; started=false;
+    document.getElementById('score').textContent='0';
+    document.getElementById('lives').textContent='❤️❤️❤️';
+    cancelAnimationFrame(raf);
+    render();
+  }
+
+  function livesStr(n) { return '❤️'.repeat(n)+'🖤'.repeat(Math.max(0,3-n)); }
+
+  function loop() {
+    if (!gameOver && !won) update();
+    render();
+    raf=requestAnimationFrame(loop);
+  }
+
+  function update() {
+    if (keys['ArrowLeft'])  paddle.x=Math.max(0, paddle.x-paddle.speed);
+    if (keys['ArrowRight']) paddle.x=Math.min(W-paddle.w, paddle.x+paddle.speed);
+
+    ball.x+=ball.vx; ball.y+=ball.vy;
+
+    // Wall bounces
+    if (ball.x-ball.r<0)   { ball.vx=Math.abs(ball.vx); ball.x=ball.r; }
+    if (ball.x+ball.r>W)   { ball.vx=-Math.abs(ball.vx); ball.x=W-ball.r; }
+    if (ball.y-ball.r<0)   { ball.vy=Math.abs(ball.vy); ball.y=ball.r; }
+
+    // Paddle collision
+    if (ball.vy>0 &&
+        ball.y+ball.r>=paddle.y && ball.y-ball.r<=paddle.y+paddle.h &&
+        ball.x>=paddle.x-ball.r && ball.x<=paddle.x+paddle.w+ball.r) {
+      ball.vy=-Math.abs(ball.vy);
+      const hit=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);
+      ball.vx=hit*4.5;
+      const spd=Math.hypot(ball.vx,ball.vy);
+      if (spd>0) { ball.vx=ball.vx/spd*ball.baseSpeed; ball.vy=ball.vy/spd*ball.baseSpeed; }
+      ball.y=paddle.y-ball.r-1;
+    }
+
+    // Bottom
+    if (ball.y+ball.r>H) {
+      lives--;
+      document.getElementById('lives').textContent=livesStr(lives);
+      if (lives<=0) { gameOver=true; return; }
+      ball.x=paddle.x+paddle.w/2;
+      ball.y=paddle.y-ball.r-10;
+      ball.vx=3.5; ball.vy=-ball.baseSpeed;
+      started=false;
+    }
+
+    // Brick collisions
+    for (const b of bricks) {
+      if (!b.alive) continue;
+      const closestX=Math.max(b.x, Math.min(ball.x, b.x+b.w));
+      const closestY=Math.max(b.y, Math.min(ball.y, b.y+b.h));
+      const dx=ball.x-closestX, dy=ball.y-closestY;
+      if (dx*dx+dy*dy<=ball.r*ball.r) {
+        b.alive=false;
+        score+=10;
+        document.getElementById('score').textContent=score;
+        if (Math.abs(dx)>Math.abs(dy)) ball.vx=-ball.vx;
+        else ball.vy=-ball.vy;
+        ball.baseSpeed=Math.min(7.5, ball.baseSpeed+0.05);
+        const spd=Math.hypot(ball.vx,ball.vy);
+        if (spd>0) { ball.vx=ball.vx/spd*ball.baseSpeed; ball.vy=ball.vy/spd*ball.baseSpeed; }
+        break;
+      }
+    }
+
+    if (bricks.every(b=>!b.alive)) won=true;
+  }
+
+  function render() {
+    ctx.fillStyle='#0a1628';
+    ctx.fillRect(0,0,W,H);
+
+    // Bricks
+    bricks.forEach(b=>{
+      if (!b.alive) return;
+      ctx.fillStyle=b.color;
+      ctx.fillRect(b.x,b.y,b.w,b.h);
+      ctx.fillStyle='rgba(255,255,255,0.25)';
+      ctx.fillRect(b.x,b.y,b.w,3);
+      ctx.fillRect(b.x,b.y,3,b.h);
+      ctx.fillStyle='rgba(0,0,0,0.15)';
+      ctx.fillRect(b.x,b.y+b.h-3,b.w,3);
+    });
+
+    // Paddle
+    const px=paddle.x, py=paddle.y, pw=paddle.w, ph=paddle.h;
+    const gr=ctx.createLinearGradient(0,py,0,py+ph);
+    gr.addColorStop(0,'#4fc3f7'); gr.addColorStop(1,'#0288d1');
+    ctx.fillStyle=gr;
+    ctx.beginPath();
+    ctx.roundRect(px,py,pw,ph,ph/2);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.roundRect(px+4,py+2,pw-8,3,2);
+    ctx.fill();
+
+    // Ball
+    ctx.save();
+    ctx.shadowColor='#4fc3f7'; ctx.shadowBlur=12;
+    const bg=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,ball.r);
+    bg.addColorStop(0,'#80deea'); bg.addColorStop(1,'#0288d1');
+    ctx.fillStyle=bg;
+    ctx.beginPath();
+    ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // Start overlay
+    if (!started && !gameOver && !won) {
+      ctx.fillStyle='rgba(10,22,40,0.6)';
+      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#4fc3f7';
+      ctx.font='bold 20px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('클릭 또는 스페이스로 시작', W/2, H/2-8);
+      ctx.fillStyle='#8892b0';
+      ctx.font='14px Segoe UI';
+      ctx.fillText('마우스 또는 방향키로 패들 조작', W/2, H/2+18);
+    }
+
+    // Game over
+    if (gameOver) {
+      ctx.fillStyle='rgba(0,0,0,0.68)';
+      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#e94560';
+      ctx.font='bold 30px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('게임 오버!', W/2, H/2-22);
+      ctx.fillStyle='#e8eaf6';
+      ctx.font='18px Segoe UI';
+      ctx.fillText(`점수: ${score}`, W/2, H/2+10);
+      ctx.fillStyle='#8892b0';
+      ctx.font='14px Segoe UI';
+      ctx.fillText('R키 또는 버튼으로 재시작', W/2, H/2+36);
+    }
+
+    // Win
+    if (won) {
+      ctx.fillStyle='rgba(0,0,0,0.68)';
+      ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#ffd700';
+      ctx.font='bold 28px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('🏆 클리어!', W/2, H/2-22);
+      ctx.fillStyle='#e8eaf6';
+      ctx.font='18px Segoe UI';
+      ctx.fillText(`최종 점수: ${score}`, W/2, H/2+10);
+      ctx.fillStyle='#8892b0';
+      ctx.font='14px Segoe UI';
+      ctx.fillText('R키 또는 버튼으로 다시 도전', W/2, H/2+36);
+    }
+  }
+
+  // Paddle follows mouse
+  canvas.addEventListener('mousemove', e => {
+    const rect=canvas.getBoundingClientRect();
+    const scale=W/rect.width;
+    paddle.x=Math.max(0, Math.min(W-paddle.w, (e.clientX-rect.left)*scale-paddle.w/2));
+    if (!started && !gameOver && !won) ball.x=paddle.x+paddle.w/2;
+  });
+
+  function startGame() {
+    if (!started && !gameOver && !won) {
+      started=true;
+      ball.vx=3.5*(Math.random()>0.5?1:-1);
+      ball.vy=-ball.baseSpeed;
+      if (!raf) raf=requestAnimationFrame(loop);
+    }
+  }
+
+  canvas.addEventListener('click', startGame);
+  document.addEventListener('keydown', e => {
+    keys[e.key]=true;
+    if (e.key===' ') { e.preventDefault(); startGame(); }
+    if (e.key==='r'||e.key==='R') init();
+    if (['ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  });
+  document.addEventListener('keyup', e => { keys[e.key]=false; });
+
+  document.getElementById('newBtn').addEventListener('click', init);
+
+  init();
+  raf=requestAnimationFrame(loop);
+</script>
+</body>
+</html>

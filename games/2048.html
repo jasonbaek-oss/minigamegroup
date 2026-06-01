@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔢 2048</title>
+  <style>
+    :root {
+      --bg: #1a1a2e; --panel: #16213e; --blue: #0f3460;
+      --text: #e8eaf6; --muted: #8892b0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding-top: 60px;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(26,26,46,0.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      height: 52px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 28px;
+    }
+    .nav-back { color: #8892b0; text-decoration: none; font-size: 0.88rem; transition: color .2s; }
+    .nav-back:hover { color: #e8eaf6; }
+    .nav-title { font-size: 1rem; font-weight: 700; color: #ff9800; }
+
+    h1 { font-size: 2rem; margin: 24px 0 6px; color: #ff9800; font-weight: 800; }
+
+    .top-bar {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 18px; flex-wrap: wrap; justify-content: center;
+    }
+    .score-box {
+      background: var(--panel); border: 1px solid rgba(255,152,0,0.3);
+      border-radius: 10px; padding: 8px 20px; text-align: center; min-width: 90px;
+    }
+    .score-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .score-val { font-size: 1.4rem; font-weight: 800; color: #ff9800; }
+
+    .new-btn {
+      padding: 9px 22px; border: none; border-radius: 20px;
+      background: #ff9800; color: #fff; font-size: 0.9rem;
+      font-weight: 700; cursor: pointer; transition: background .2s, transform .15s;
+    }
+    .new-btn:hover { background: #e68900; transform: scale(1.04); }
+
+    .grid-wrap {
+      background: #0f2040; border-radius: 12px; padding: 10px;
+      box-shadow: 0 0 40px rgba(255,152,0,0.12);
+      border: 1px solid rgba(255,152,0,0.2);
+    }
+    #grid {
+      display: grid; grid-template-columns: repeat(4, 80px);
+      grid-template-rows: repeat(4, 80px);
+      gap: 8px;
+    }
+
+    .cell {
+      width: 80px; height: 80px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.6rem;
+      transition: transform 0.1s;
+      background: #0a1a30;
+    }
+    .cell.pop { animation: pop .12s ease; }
+    @keyframes pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+
+    /* tile colors */
+    .t2    { background: rgba(79,195,247,.25);  color: #4fc3f7;  font-size: 1.6rem; }
+    .t4    { background: rgba(129,199,132,.25); color: #81c784;  font-size: 1.6rem; }
+    .t8    { background: rgba(255,183,77,.3);   color: #ffb74d;  font-size: 1.6rem; }
+    .t16   { background: rgba(255,112,67,.3);   color: #ff7043;  font-size: 1.5rem; }
+    .t32   { background: rgba(233,69,96,.3);    color: #e94560;  font-size: 1.5rem; }
+    .t64   { background: rgba(200,40,70,.4);    color: #ff5252;  font-size: 1.5rem; }
+    .t128  { background: rgba(156,39,176,.3);   color: #ce93d8;  font-size: 1.3rem; }
+    .t256  { background: rgba(103,58,183,.35);  color: #b39ddb;  font-size: 1.3rem; }
+    .t512  { background: rgba(57,73,171,.4);    color: #9fa8da;  font-size: 1.3rem; }
+    .t1024 { background: rgba(38,198,218,.3);   color: #80deea;  font-size: 1.0rem; }
+    .t2048 {
+      background: radial-gradient(circle, rgba(255,215,0,.35), rgba(255,152,0,.25));
+      color: #ffd700; font-size: 1.0rem;
+      box-shadow: 0 0 20px rgba(255,215,0,.4);
+      animation: glow 1s ease-in-out infinite alternate;
+    }
+    @keyframes glow { from{box-shadow:0 0 10px rgba(255,215,0,.3)} to{box-shadow:0 0 28px rgba(255,215,0,.7)} }
+
+    #message {
+      margin-top: 16px; font-size: 1.2rem; font-weight: 800;
+      min-height: 28px; text-align: center; letter-spacing: 1px;
+    }
+    .msg-win  { color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,.6); }
+    .msg-lose { color: #e94560; }
+
+    .hint { margin-top: 18px; color: var(--muted); font-size: 0.82rem; text-align: center; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="../index.html" class="nav-back">← 허브로</a>
+  <span class="nav-title">🔢 2048</span>
+  <span></span>
+</nav>
+
+<h1>2048</h1>
+
+<div class="top-bar">
+  <div class="score-box">
+    <div class="score-label">점수</div>
+    <div class="score-val" id="score">0</div>
+  </div>
+  <div class="score-box">
+    <div class="score-label">최고</div>
+    <div class="score-val" id="best">0</div>
+  </div>
+  <button class="new-btn" id="newBtn">새 게임</button>
+</div>
+
+<div class="grid-wrap">
+  <div id="grid"></div>
+</div>
+
+<div id="message"></div>
+<p class="hint">방향키로 타일을 밀어 같은 숫자를 합치세요<br>2048 타일을 만들면 승리!</p>
+
+<script>
+  let board, score, best = 0, won = false, over = false;
+
+  function init() {
+    board = Array.from({length:4}, ()=>Array(4).fill(0));
+    score = 0; won = false; over = false;
+    addTile(); addTile();
+    updateDOM();
+    document.getElementById('message').textContent = '';
+    document.getElementById('message').className = '';
+  }
+
+  function addTile() {
+    const empty = [];
+    for (let r=0;r<4;r++) for (let c=0;c<4;c++) if (!board[r][c]) empty.push([r,c]);
+    if (!empty.length) return;
+    const [r,c] = empty[Math.floor(Math.random()*empty.length)];
+    board[r][c] = Math.random()<0.9 ? 2 : 4;
+  }
+
+  function slideRow(row) {
+    let arr = row.filter(x=>x);
+    for (let i=0;i<arr.length-1;i++) {
+      if (arr[i]===arr[i+1]) {
+        arr[i]*=2; score+=arr[i]; arr.splice(i+1,1);
+        if (arr[i]===2048 && !won) {
+          won=true;
+          const msg=document.getElementById('message');
+          msg.textContent='🏆 2048 달성! 계속 도전하세요!'; msg.className='msg-win';
+        }
+      }
+    }
+    while (arr.length<4) arr.push(0);
+    return arr;
+  }
+
+  function move(dir) {
+    if (over) return;
+    const prev = JSON.stringify(board);
+
+    if (dir==='left') {
+      for (let r=0;r<4;r++) board[r] = slideRow(board[r]);
+    } else if (dir==='right') {
+      for (let r=0;r<4;r++) board[r] = slideRow([...board[r]].reverse()).reverse();
+    } else if (dir==='up') {
+      for (let c=0;c<4;c++) {
+        const col = [board[0][c],board[1][c],board[2][c],board[3][c]];
+        const res = slideRow(col);
+        for (let r=0;r<4;r++) board[r][c]=res[r];
+      }
+    } else if (dir==='down') {
+      for (let c=0;c<4;c++) {
+        const col = [board[0][c],board[1][c],board[2][c],board[3][c]].reverse();
+        const res = slideRow(col).reverse();
+        for (let r=0;r<4;r++) board[r][c]=res[r];
+      }
+    }
+
+    if (JSON.stringify(board)!==prev) {
+      addTile();
+      if (score>best) { best=score; document.getElementById('best').textContent=best; }
+      updateDOM();
+      checkLose();
+    }
+  }
+
+  function checkLose() {
+    for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
+      if (!board[r][c]) return;
+      if (c<3&&board[r][c]===board[r][c+1]) return;
+      if (r<3&&board[r][c]===board[r+1][c]) return;
+    }
+    over=true;
+    const msg=document.getElementById('message');
+    msg.textContent='😢 게임 오버! 새 게임을 시작하세요.'; msg.className='msg-lose';
+  }
+
+  function updateDOM() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML='';
+    document.getElementById('score').textContent = score.toLocaleString();
+    for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
+      const div=document.createElement('div');
+      const v=board[r][c];
+      div.className='cell'+(v?` t${v}`:'');
+      div.textContent=v||'';
+      if (v) div.classList.add('pop');
+      grid.appendChild(div);
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    const map = {ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+    if (map[e.key]) { e.preventDefault(); move(map[e.key]); }
+  });
+
+  // Touch swipe
+  let tx=0, ty=0;
+  document.addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; });
+  document.addEventListener('touchend', e=>{
+    const dx=e.changedTouches[0].clientX-tx;
+    const dy=e.changedTouches[0].clientY-ty;
+    if (Math.abs(dx)>Math.abs(dy)) move(dx>0?'right':'left');
+    else move(dy>0?'down':'up');
+  });
+
+  document.getElementById('newBtn').addEventListener('click', init);
+
+  init();
+</script>
+</body>
+</html>

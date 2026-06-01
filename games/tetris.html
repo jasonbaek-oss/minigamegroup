@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧱 테트리스</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e; color: #e8eaf6;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding-top: 60px;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(26,26,46,0.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      height: 52px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 28px;
+    }
+    .nav-back { color: #8892b0; text-decoration: none; font-size: 0.88rem; transition: color .2s; }
+    .nav-back:hover { color: #e8eaf6; }
+    .nav-title { font-size: 1rem; font-weight: 700; color: #ce93d8; }
+
+    h1 { font-size: 2rem; margin: 22px 0 16px; color: #ce93d8; font-weight: 800; }
+
+    .game-area {
+      display: flex; gap: 20px; align-items: flex-start;
+    }
+
+    .canvas-wrap {
+      border: 2px solid rgba(206,147,216,0.3); border-radius: 10px;
+      box-shadow: 0 0 40px rgba(206,147,216,0.1); overflow: hidden;
+    }
+    #canvas { display: block; }
+
+    .side-panel {
+      width: 140px; display: flex; flex-direction: column; gap: 16px;
+    }
+    .panel-box {
+      background: #16213e; border: 1px solid rgba(206,147,216,0.2);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .panel-label {
+      font-size: 0.65rem; color: #8892b0; letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .panel-val { font-size: 1.5rem; font-weight: 800; color: #ce93d8; }
+    .panel-val.level { color: #ffd54f; }
+    .panel-val.lines { color: #80deea; }
+
+    .next-wrap { width: 112px; height: 112px; background: #0a1628; border-radius: 8px; overflow:hidden; }
+    #nextCanvas { display: block; }
+
+    .new-btn {
+      padding: 9px 0; border: none; border-radius: 20px;
+      background: #9c27b0; color: #fff; font-size: 0.88rem;
+      font-weight: 700; cursor: pointer; width: 100%;
+      transition: background .2s, transform .15s;
+    }
+    .new-btn:hover { background: #7b1fa2; transform: scale(1.04); }
+
+    .hint {
+      margin-top: 14px; color: #8892b0; font-size: 0.78rem;
+      text-align: center; line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="../index.html" class="nav-back">← 허브로</a>
+  <span class="nav-title">🧱 테트리스</span>
+  <span></span>
+</nav>
+
+<h1>테트리스</h1>
+
+<div class="game-area">
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="280" height="560"></canvas>
+  </div>
+
+  <div class="side-panel">
+    <div class="panel-box">
+      <div class="panel-label">NEXT</div>
+      <div class="next-wrap"><canvas id="nextCanvas" width="112" height="112"></canvas></div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">SCORE</div>
+      <div class="panel-val" id="score">0</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">LEVEL</div>
+      <div class="panel-val level" id="level">1</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">LINES</div>
+      <div class="panel-val lines" id="lines">0</div>
+    </div>
+    <button class="new-btn" id="newBtn">새 게임</button>
+  </div>
+</div>
+
+<p class="hint">
+  ← → 이동 &nbsp;·&nbsp; ↑ 회전 &nbsp;·&nbsp; ↓ 빠르게<br>
+  Space 즉시 낙하 &nbsp;·&nbsp; R 재시작
+</p>
+
+<script>
+  const canvas   = document.getElementById('canvas');
+  const ctx      = canvas.getContext('2d');
+  const nextCvs  = document.getElementById('nextCanvas');
+  const nextCtx  = nextCvs.getContext('2d');
+
+  const COLS=10, ROWS=20, CELL=28;
+
+  const PIECES = [
+    { color:'#00f0f0', grid:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] }, // I
+    { color:'#f0f000', grid:[[1,1],[1,1]] },                              // O
+    { color:'#c000f0', grid:[[0,1,0],[1,1,1],[0,0,0]] },                 // T
+    { color:'#00d000', grid:[[0,1,1],[1,1,0],[0,0,0]] },                 // S
+    { color:'#e00000', grid:[[1,1,0],[0,1,1],[0,0,0]] },                 // Z
+    { color:'#0050e0', grid:[[1,0,0],[1,1,1],[0,0,0]] },                 // J
+    { color:'#f0a000', grid:[[0,0,1],[1,1,1],[0,0,0]] },                 // L
+  ];
+
+  function rotateCW(m) {
+    const rows=m.length, cols=m[0].length;
+    return Array.from({length:cols},(_,c)=>Array.from({length:rows},(_,r)=>m[rows-1-r][c]));
+  }
+
+  let board, current, next, score, lines, level, gameOver, dropTimer, lockDelay;
+
+  function newPiece(type) {
+    const p = PIECES[type||Math.floor(Math.random()*PIECES.length)];
+    return {
+      grid: p.grid.map(r=>[...r]),
+      color: p.color,
+      x: Math.floor((COLS-p.grid[0].length)/2),
+      y: 0
+    };
+  }
+
+  function isValid(piece) {
+    for (let r=0;r<piece.grid.length;r++)
+      for (let c=0;c<piece.grid[r].length;c++)
+        if (piece.grid[r][c]) {
+          const nx=piece.x+c, ny=piece.y+r;
+          if (nx<0||nx>=COLS||ny>=ROWS) return false;
+          if (ny>=0 && board[ny][nx]) return false;
+        }
+    return true;
+  }
+
+  function place() {
+    current.grid.forEach((row,r)=>
+      row.forEach((cell,c)=>{ if(cell && current.y+r>=0) board[current.y+r][current.x+c]=current.color; })
+    );
+    clearLines();
+    current=next;
+    next=newPiece();
+    if (!isValid(current)) { gameOver=true; render(); return; }
+    render();
+  }
+
+  function clearLines() {
+    let cleared=0;
+    for (let r=ROWS-1;r>=0;r--) {
+      if (board[r].every(c=>c)) {
+        board.splice(r,1);
+        board.unshift(Array(COLS).fill(null));
+        cleared++; r++;
+      }
+    }
+    if (cleared) {
+      const pts=[0,100,300,500,800][cleared]||800;
+      score+=pts*level;
+      lines+=cleared;
+      level=Math.floor(lines/10)+1;
+      resetDrop();
+      document.getElementById('score').textContent=score.toLocaleString();
+      document.getElementById('lines').textContent=lines;
+      document.getElementById('level').textContent=level;
+    }
+  }
+
+  function drop() {
+    const moved={...current, y:current.y+1};
+    if (isValid(moved)) { current=moved; render(); }
+    else { place(); }
+  }
+
+  function hardDrop() {
+    while (isValid({...current, y:current.y+1})) { current={...current, y:current.y+1}; score+=2; }
+    place();
+    document.getElementById('score').textContent=score.toLocaleString();
+  }
+
+  function rotate() {
+    const rotated=rotateCW(current.grid);
+    const p={...current, grid:rotated};
+    if (isValid(p)) { current=p; }
+    else if (isValid({...p,x:p.x+1})) { current={...p,x:p.x+1}; }
+    else if (isValid({...p,x:p.x-1})) { current={...p,x:p.x-1}; }
+    else if (isValid({...p,x:p.x+2})) { current={...p,x:p.x+2}; }
+    else if (isValid({...p,x:p.x-2})) { current={...p,x:p.x-2}; }
+    render();
+  }
+
+  function resetDrop() {
+    clearInterval(dropTimer);
+    const speed=Math.max(80,900-(level-1)*75);
+    dropTimer=setInterval(drop, speed);
+  }
+
+  function drawCell(c, x, y, color, ghost=false) {
+    const px=x*CELL, py=y*CELL;
+    if (ghost) {
+      c.strokeStyle=color; c.globalAlpha=0.25;
+      c.strokeRect(px+1,py+1,CELL-2,CELL-2);
+      c.globalAlpha=1; return;
+    }
+    c.fillStyle=color; c.fillRect(px+1,py+1,CELL-2,CELL-2);
+    c.fillStyle='rgba(255,255,255,0.3)';
+    c.fillRect(px+1,py+1,CELL-2,3);
+    c.fillRect(px+1,py+1,3,CELL-2);
+    c.fillStyle='rgba(0,0,0,0.2)';
+    c.fillRect(px+1,py+CELL-4,CELL-2,3);
+    c.fillRect(px+CELL-4,py+1,3,CELL-2);
+  }
+
+  function render() {
+    ctx.fillStyle='#0a1628';
+    ctx.fillRect(0,0,COLS*CELL,ROWS*CELL);
+
+    ctx.strokeStyle='rgba(15,52,96,0.45)';
+    ctx.lineWidth=0.5;
+    for (let i=1;i<COLS;i++) { ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,ROWS*CELL);ctx.stroke(); }
+    for (let i=1;i<ROWS;i++) { ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(COLS*CELL,i*CELL);ctx.stroke(); }
+
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
+      if (board[r][c]) drawCell(ctx,c,r,board[r][c]);
+
+    if (current && !gameOver) {
+      let ghostY=current.y;
+      while (isValid({...current,y:ghostY+1})) ghostY++;
+      if (ghostY>current.y)
+        current.grid.forEach((row,r)=>row.forEach((cell,c)=>{ if(cell) drawCell(ctx,current.x+c,ghostY+r,current.color,true); }));
+
+      current.grid.forEach((row,r)=>row.forEach((cell,c)=>{ if(cell) drawCell(ctx,current.x+c,current.y+r,current.color); }));
+    }
+
+    if (gameOver) {
+      ctx.fillStyle='rgba(0,0,0,0.7)';
+      ctx.fillRect(0,0,COLS*CELL,ROWS*CELL);
+      ctx.fillStyle='#e94560';
+      ctx.font='bold 26px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('GAME OVER', COLS*CELL/2, ROWS*CELL/2-20);
+      ctx.fillStyle='#8892b0';
+      ctx.font='14px Segoe UI';
+      ctx.fillText('R키 또는 버튼으로 재시작', COLS*CELL/2, ROWS*CELL/2+14);
+    }
+
+    renderNext();
+  }
+
+  function renderNext() {
+    nextCtx.fillStyle='#0a1628';
+    nextCtx.fillRect(0,0,112,112);
+    if (!next) return;
+    const g=next.grid;
+    const ox=Math.floor((4-g[0].length)/2);
+    const oy=Math.floor((4-g.length)/2);
+    const cs=24;
+    g.forEach((row,r)=>row.forEach((cell,c)=>{
+      if (!cell) return;
+      const px=(ox+c)*cs+4, py=(oy+r)*cs+4, s=cs-2;
+      nextCtx.fillStyle=next.color;
+      nextCtx.fillRect(px,py,s,s);
+      nextCtx.fillStyle='rgba(255,255,255,0.3)';
+      nextCtx.fillRect(px,py,s,3);
+      nextCtx.fillRect(px,py,3,s);
+    }));
+  }
+
+  function init() {
+    board=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+    score=0; lines=0; level=1; gameOver=false;
+    current=newPiece(); next=newPiece();
+    document.getElementById('score').textContent='0';
+    document.getElementById('lines').textContent='0';
+    document.getElementById('level').textContent='1';
+    resetDrop();
+    render();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (gameOver) { if(e.key==='r'||e.key==='R') init(); return; }
+    switch(e.key) {
+      case 'ArrowLeft':
+        if (isValid({...current,x:current.x-1})) { current={...current,x:current.x-1}; render(); }
+        break;
+      case 'ArrowRight':
+        if (isValid({...current,x:current.x+1})) { current={...current,x:current.x+1}; render(); }
+        break;
+      case 'ArrowDown':
+        if (isValid({...current,y:current.y+1})) { current={...current,y:current.y+1}; score++; render(); }
+        break;
+      case 'ArrowUp': rotate(); break;
+      case ' ': hardDrop(); break;
+      case 'r': case 'R': init(); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  document.getElementById('newBtn').addEventListener('click', init);
+
+  init();
+</script>
+</body>
+</html>
