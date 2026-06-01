@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "$input = $null; $lines = @(); while ($null -ne ($line = [Console]::In.ReadLine())) { $lines += $line }; $json = $lines -join \"`n\"; try { $obj = $json | ConvertFrom-Json; $fp = if ($obj.tool_input.file_path) { $obj.tool_input.file_path } else { $obj.tool_response.filePath }; $fn = Split-Path $fp -Leaf } catch { $fn = 'files' }; Set-Location 'C:\\Users\\seonghyeon.baek\\Desktop\\Claude_Cowork\\CLAUDE'; git add -A 2>$null; $status = git status --porcelain 2>$null; if ($status) { git commit -m \"auto: $fn 변경사항 저장\" 2>$null; git push origin master 2>$null }",
+            "timeout": 30,
+            "statusMessage": "변경사항 커밋 중..."
+          }
+        ]
+      }
+    ]
+  }
+}
